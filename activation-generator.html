@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>激活码生成器 - 何武昂工作室</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        html,body{margin:0;padding:0;height:100%;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);display:flex;align-items:center;justify-content:center;color:#ffffff}
+        .card{background:rgba(0,0,0,0.35);backdrop-filter:blur(12px);padding:40px 35px;border-radius:20px;box-shadow:0 25px 45px rgba(0,0,0,0.35);text-align:center;width:90%;max-width:480px}
+        h2{margin:0 0 20px;font-size:30px;font-weight:600;letter-spacing:1px}
+        p{font-size:14px;color:#e0e7ff;margin-bottom:24px;line-height:1.6}
+        input,button{width:100%;padding:14px 16px;border:none;border-radius:10px;font-size:16px}
+        input{background:rgba(255,255,255,0.15);color:#fff;text-align:center;margin-bottom:18px}
+        button{background:#34d399;color:#fff;cursor:pointer;transition:all .3s ease;font-weight:600}
+        button:hover{background:#10b981;transform:translateY(-2px)}
+        .code-display{margin-top:24px;font-size:22px;font-weight:600;letter-spacing:2px;word-break:break-all}
+        .copy-btn{margin-top:12px;background:rgba(255,255,255,0.2)!important;font-size:14px;width:auto;padding:8px 18px;display:none}
+        .footer{margin-top:32px;font-size:12px;color:#d1d5db}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>激活码生成器</h2>
+        <p>输入用户机器码，生成专属激活码</p>
+        <input id="machine-input" placeholder="粘贴用户机器码 (16位)" />
+        <select id="days-input" style="width:100%;padding:12px;border:none;border-radius:10px;background:rgba(212, 5, 5, 0.15);color:#ffffff;text-align:center;margin-bottom:18px;font-size:16px">
+            <option value="30">30 天</option>
+            <option value="90">90 天</option>
+            <option value="180">180 天</option>
+            <option value="365" selected>365 天</option>
+            <option value="9999">永久 (9999 天)</option>
+        </select>
+        <button id="generate-btn">生成激活码</button>
+        <div class="code-display" id="code-display"></div>
+        <button class="copy-btn" id="copy-btn">复制</button>
+        <div class="footer">© 2024 何武昂工作室 | 管理员微信 h421094218</div>
+    </div>
+
+    <script>
+        (function(){
+            const secretSalt = 'HeWuAngStudio2024!';
+            function generateCode(mid, days){
+                const hash = CryptoJS.SHA256(mid + secretSalt + days).toString().toUpperCase();
+                return hash.substr(0,16).match(/.{1,4}/g).join('-') + '-' + days;
+            }
+            const machineInput = document.getElementById('machine-input');
+            const display = document.getElementById('code-display');
+            const copyBtn = document.getElementById('copy-btn');
+
+            document.getElementById('generate-btn').addEventListener('click',()=>{
+                const mid = machineInput.value.trim().replace(/[^A-F0-9]/ig,'').toUpperCase();
+                if(mid.length !== 16){
+                    alert('⚠️ 请输入正确的 16 位机器码');
+                    return;
+                }
+                const days = parseInt(document.getElementById('days-input').value);
+                const code = generateCode(mid, days);
+                display.textContent = code;
+                copyBtn.style.display = 'inline-block';
+                copyBtn.onclick = ()=>{
+                    navigator.clipboard.writeText(code).then(()=>{
+                        copyBtn.textContent='已复制!';
+                        setTimeout(()=>copyBtn.textContent='复制',1500);
+                    });
+                };
+            });
+
+            // 若 URL 带有 ?mid=xxxx 可自动填充
+            const urlParams = new URLSearchParams(location.search);
+            if(urlParams.get('mid')){
+                machineInput.value = urlParams.get('mid');
+            }
+        })();
+    </script>
+</body>
+</html> 
