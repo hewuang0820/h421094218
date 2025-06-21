@@ -5343,4 +5343,14 @@ console.log("格式化完成!");
         }catch(e){console.error(e)}
       }
     </script>
+
+    <script>
+    document.addEventListener('keydown',function(e){
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){
+         e.preventDefault();            // 阻止默认保存
+         e.stopPropagation();
+         alert('已禁用页面保存功能');
+      }
+    });
+    </script>
 </body></html>
