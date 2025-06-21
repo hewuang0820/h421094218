@@ -4833,8 +4833,12 @@ console.log("格式化完成!");
                 return window.HWA_MACHINE_ID || localStorage.getItem('HWA_MACHINE_ID') || calcDeterministicMachineId();
             }
             // 根据机器码和盐生成激活码：格式  XXXX-XXXX-XXXX-XXXX-<days>
+            function normalizeMid(mid){
+                return (mid||'').replace(/[^A-F0-9]/ig,'').toUpperCase();
+            }
             function generateCode(mid, days){
-                const hash = CryptoJS.SHA256(mid + secretSalt + days).toString().toUpperCase();
+                const cleanMid = normalizeMid(mid);
+                const hash = CryptoJS.SHA256(cleanMid + secretSalt + days).toString().toUpperCase();
                 return hash.substr(0,16).match(/.{1,4}/g).join('-') + '-' + days;
             }
             // 从激活码解析有效期（天）
@@ -4849,7 +4853,7 @@ console.log("格式化完成!");
                 const days = getDays(code);
                 if(!days) return false;
                 const hashPart = code.trim().toUpperCase().split('-').slice(0,4).join('');
-                const expected = CryptoJS.SHA256(getMachineId() + secretSalt + days).toString().toUpperCase().substr(0,16);
+                const expected = CryptoJS.SHA256(normalizeMid(getMachineId()) + secretSalt + days).toString().toUpperCase().substr(0,16);
                 return hashPart === expected;
             }
 
