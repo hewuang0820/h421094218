@@ -16,12 +16,8 @@
       })();
     </script>
     <script src="./saved_resource"></script>
-    <!-- 全局模板对象，必须在任何脚本之前定义 -->
-    <script>window.savedTemplates = window.savedTemplates || {};</script>
-    <!-- CryptoJS 提前加载，供后续脚本使用 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <!-- FingerprintJS UMD 兼容版 -->
-    <script src="https://unpkg.com/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+    <!-- FingerprintJS — 生成跨浏览器稳定机器码 -->
+    <script src="https://openfpcdn.io/fingerprintjs/v3"></script>
     <script>
         // 生成并存储全局机器码（大写）
         window.HWA_FP_READY = FingerprintJS.load().then(fp => fp.get()).then(r => {
@@ -236,7 +232,7 @@
                     <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/30 shadow-lg">
                         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                        </svg>
+                    </svg>
                     </div>
                     <div>
                         <h1 class="text-3xl md:text-4xl font-bold text-white bg-clip-text bg-gradient-to-r from-white to-blue-100">公众号排版工具</h1>
@@ -568,7 +564,7 @@
                                         
                                         <!-- 段落颜色设置 -->
                                         <div>
-                                            <label class="flex items-center space-x-2">
+                                            <label class="flex items-center mb-1">
                                                 <span>文本颜色</span>
                                                 <div class="ml-2">
                                                     <select id="p-color-mode" class="text-sm p-1 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary dark:bg-gray-600 dark:border-gray-500">
@@ -1161,7 +1157,7 @@
                                             </button>
                                             <button id="import-templates" class="bg-blue-500 p-1 rounded-md hover:bg-blue-600 text-white" title="导入模板库">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4 4m0 0l-4-4m4 4V4"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                                                 </svg>
                                             </button>
                                             <button id="refresh-templates" class="bg-gray-200 dark:bg-gray-600 p-1 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">
@@ -3259,14 +3255,6 @@
                 // 自动加载预设排版.json中的预设
                 async function loadExternalTemplates() {
                     try {
-                        // 若以 file:// 打开，直接跳过 fetch，使用内置模板
-                        if(location.protocol === 'file:'){
-                            savedTemplates = builtInTemplates;
-                            updateTemplateList();
-                            updateBatchTemplateList && updateBatchTemplateList();
-                            return;
-                        }
-
                         // 首先尝试加载同目录下的预设排版.json
                         const response = await fetch('./index.json');
                         if (response.ok) {
@@ -3899,6 +3887,437 @@
                     console.warn(`模板"${name}"不存在`);
                     return false;
                 }
+            }
+            
+            // 更新模板列表
+            function updateTemplateList() {
+                templateList.innerHTML = '';
+                
+                if (Object.keys(savedTemplates).length === 0) {
+                    templateList.innerHTML = '<div class="text-gray-500 italic dark:text-gray-400">暂无保存的模板</div>';
+                    return;
+                }
+                
+                const filter = document.getElementById('template-filter').value;
+                
+                for (const [name, data] of Object.entries(savedTemplates)) {
+                    // 筛选模板
+                    if (filter !== 'all' && data.type !== filter) continue;
+                    
+                    const date = new Date(data.timestamp);
+                    const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                    
+                    const templateItem = document.createElement('div');
+                    templateItem.className = 'bg-white dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow duration-200';
+                    
+                    // 为不同类型模板添加不同样式
+                    if (data.type === 'built-in') {
+                        templateItem.classList.add('border-l-4', 'border-l-primary');
+                    }
+                    
+                    templateItem.innerHTML = `
+                        <div class="flex flex-col space-y-2">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="font-medium text-lg">${name}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        ${data.type === 'built-in' ? 
+                                            '<span class="bg-primary text-white px-1 py-0.5 rounded text-xs mr-1">内置</span>' : 
+                                            '<span class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs mr-1">自定义</span>'
+                                        }
+                                        ${formattedDate}
+                                    </div>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button class="apply-template bg-primary text-white p-1 rounded-md text-sm hover:bg-primary-dark" title="应用此模板" data-name="${name}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                    </button>
+                                    ${data.type !== 'built-in' ? `
+                                    <button class="delete-template bg-red-500 text-white p-1 rounded-md text-sm hover:bg-red-600" title="删除此模板" data-name="${name}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                        </svg>
+                                    </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            ${data.description ? `<p class="text-sm text-gray-600 dark:text-gray-300">${data.description}</p>` : ''}
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${data.styleConfig.headings.h1.color ? 
+                                    `<div class="w-5 h-5 rounded-full" style="background-color: ${data.styleConfig.headings.h1.color}" title="标题颜色"></div>` : ''
+                                }
+                                ${data.styleConfig.emphasis.strong.color ? 
+                                    `<div class="w-5 h-5 rounded-full" style="background-color: ${data.styleConfig.emphasis.strong.color}" title="强调颜色"></div>` : ''
+                                }
+                                ${data.styleConfig.paragraph.colorMode === 'multiple' && data.styleConfig.paragraph.colors.length > 0 ? 
+                                    data.styleConfig.paragraph.colors.map(color => 
+                                        `<div class="w-5 h-5 rounded-full" style="background-color: ${color}" title="段落颜色"></div>`
+                                    ).join('') : 
+                                    data.styleConfig.paragraph.color ? 
+                                        `<div class="w-5 h-5 rounded-full" style="background-color: ${data.styleConfig.paragraph.color}" title="段落颜色"></div>` : ''
+                                }
+                            </div>
+                        </div>
+                    `;
+                    
+                    templateList.appendChild(templateItem);
+                }
+                
+                // 绑定模板操作按钮事件
+                document.querySelectorAll('.apply-template').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const name = btn.dataset.name;
+                        applyTemplate(name);
+                    });
+                });
+                
+                document.querySelectorAll('.delete-template').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const name = btn.dataset.name;
+                        if (confirm(`确定要删除模板"${name}"吗？`)) {
+                            delete savedTemplates[name];
+                            updateTemplateList();
+                            updateBatchTemplateList();
+                            populateTemplateCheckboxes();
+                            showNotification(`模板"${name}"已删除`);
+                        }
+                    });
+                });
+                
+                // 如果没有模板满足筛选条件
+                if (templateList.children.length === 0) {
+                    templateList.innerHTML = '<div class="text-gray-500 italic dark:text-gray-400">没有符合条件的模板</div>';
+                }
+            }
+            
+            // 模板筛选器事件
+            document.getElementById('template-filter').addEventListener('change', updateTemplateList);
+            
+            // 刷新模板按钮
+            document.getElementById('refresh-templates').addEventListener('click', updateTemplateList);
+
+            // 更新批量处理模板下拉列表
+            function updateBatchTemplateList() {
+                const batchTemplate = document.getElementById('batch-template');
+                batchTemplate.innerHTML = '<option value="">使用当前样式</option>';
+                
+                for (const name of Object.keys(savedTemplates)) {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    batchTemplate.appendChild(option);
+                }
+            }
+
+            // 从配置更新UI
+            function updateUIFromConfig() {
+                // 更新全局设置
+                centerContent.checked = styleConfig.global.centerContent;
+                
+                if (styleConfig.global.font) {
+                    const matchingOption = Array.from(globalFont.options).find(option => option.value === styleConfig.global.font);
+                    if (matchingOption) {
+                        globalFont.value = styleConfig.global.font;
+                        customFontContainer.classList.add('hidden');
+                    } else {
+                        globalFont.value = 'custom';
+                        customFontContainer.classList.remove('hidden');
+                        customFont.value = styleConfig.global.font;
+                    }
+                }
+                
+                lineHeight.value = styleConfig.global.lineHeight;
+                lineHeightValue.textContent = styleConfig.global.lineHeight;
+                letterSpacing.value = styleConfig.global.letterSpacing;
+                letterSpacingValue.textContent = styleConfig.global.letterSpacing + 'em';
+                
+                // 更新段落设置
+                pFontSize.value = styleConfig.paragraph.fontSize;
+                pFontSizeValue.textContent = styleConfig.paragraph.fontSize + 'px';
+                pColor.value = styleConfig.paragraph.color;
+                pColorHex.value = styleConfig.paragraph.color;
+                pMargin.value = styleConfig.paragraph.margin;
+                pMarginValue.textContent = styleConfig.paragraph.margin + 'em';
+                pColorMode.value = styleConfig.paragraph.colorMode;
+                document.querySelectorAll('.p-color-group').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`p-color-${styleConfig.paragraph.colorMode}`).classList.remove('hidden');
+                
+                // 更新段落颜色列表
+                updateColorList('p', styleConfig.paragraph.colors);
+                updateRandomColorDisplay('p', styleConfig.paragraph.randomColors);
+                document.getElementById('p-random-count').value = styleConfig.paragraph.randomCount || 3;
+                
+                // 更新标题设置
+                document.getElementById('h1-font-size').value = styleConfig.headings.h1.fontSize;
+                document.getElementById('h1-font-size-value').textContent = styleConfig.headings.h1.fontSize + 'px';
+                document.getElementById('h1-color').value = styleConfig.headings.h1.color;
+                document.getElementById('h1-color-hex').value = styleConfig.headings.h1.color;
+                document.getElementById('h1-bg-color').value = styleConfig.headings.h1.bgColor;
+                document.getElementById('h1-bg-color-hex').value = styleConfig.headings.h1.bgColor;
+                document.getElementById('h1-border').checked = styleConfig.headings.h1.border;
+                
+                document.getElementById('h2-font-size').value = styleConfig.headings.h2.fontSize;
+                document.getElementById('h2-font-size-value').textContent = styleConfig.headings.h2.fontSize + 'px';
+                document.getElementById('h2-color').value = styleConfig.headings.h2.color;
+                document.getElementById('h2-color-hex').value = styleConfig.headings.h2.color;
+                document.getElementById('h2-border-color').value = styleConfig.headings.h2.borderColor;
+                document.getElementById('h2-border-color-hex').value = styleConfig.headings.h2.borderColor;
+                
+                document.getElementById('h3-font-size').value = styleConfig.headings.h3.fontSize;
+                document.getElementById('h3-font-size-value').textContent = styleConfig.headings.h3.fontSize + 'px';
+                document.getElementById('h3-color').value = styleConfig.headings.h3.color;
+                document.getElementById('h3-color-hex').value = styleConfig.headings.h3.color;
+                
+                // 更新标题模板信息
+                if (styleConfig.headings.h1.useTemplate) {
+                    document.getElementById('h1-template-info').classList.remove('hidden');
+                    document.getElementById('h1-template-name').textContent = styleConfig.headings.h1.templateName || "已自定义";
+                    document.getElementById('h1-standard-settings').classList.add('hidden');
+                } else {
+                    document.getElementById('h1-template-info').classList.add('hidden');
+                    document.getElementById('h1-standard-settings').classList.remove('hidden');
+                }
+                
+                if (styleConfig.headings.h2.useTemplate) {
+                    document.getElementById('h2-template-info').classList.remove('hidden');
+                    document.getElementById('h2-template-name').textContent = styleConfig.headings.h2.templateName || "已自定义";
+                    document.getElementById('h2-standard-settings').classList.add('hidden');
+                } else {
+                    document.getElementById('h2-template-info').classList.add('hidden');
+                    document.getElementById('h2-standard-settings').classList.remove('hidden');
+                }
+                
+                if (styleConfig.headings.h3.useTemplate) {
+                    document.getElementById('h3-template-info').classList.remove('hidden');
+                    document.getElementById('h3-template-name').textContent = styleConfig.headings.h3.templateName || "已自定义";
+                    document.getElementById('h3-standard-settings').classList.add('hidden');
+                } else {
+                    document.getElementById('h3-template-info').classList.add('hidden');
+                    document.getElementById('h3-standard-settings').classList.remove('hidden');
+                }
+                
+                // 更新强调设置 - 粗体
+                document.getElementById('strong-color').value = styleConfig.emphasis.strong.color;
+                document.getElementById('strong-color-hex').value = styleConfig.emphasis.strong.color;
+                document.getElementById('strong-bg-color').value = styleConfig.emphasis.strong.bgColor;
+                document.getElementById('strong-bg-color-hex').value = styleConfig.emphasis.strong.bgColor;
+                document.getElementById('strong-underline').checked = styleConfig.emphasis.strong.underline;
+                strongColorMode.value = styleConfig.emphasis.strong.colorMode;
+                document.querySelectorAll('.strong-color-group').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`strong-color-${styleConfig.emphasis.strong.colorMode}`).classList.remove('hidden');
+                updateColorList('strong', styleConfig.emphasis.strong.colors);
+                updateRandomColorDisplay('strong', styleConfig.emphasis.strong.randomColors);
+                document.getElementById('strong-random-count').value = styleConfig.emphasis.strong.randomCount || 3;
+                
+                // 更新强调设置 - 斜体
+                document.getElementById('em-color').value = styleConfig.emphasis.em.color;
+                document.getElementById('em-color-hex').value = styleConfig.emphasis.em.color;
+                document.getElementById('em-keep-italic').checked = styleConfig.emphasis.em.keepItalic;
+                emColorMode.value = styleConfig.emphasis.em.colorMode;
+                document.querySelectorAll('.em-color-group').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`em-color-${styleConfig.emphasis.em.colorMode}`).classList.remove('hidden');
+                updateColorList('em', styleConfig.emphasis.em.colors);
+                updateRandomColorDisplay('em', styleConfig.emphasis.em.randomColors);
+                document.getElementById('em-random-count').value = styleConfig.emphasis.em.randomCount || 3;
+                
+                // 更新强调设置 - 引用
+                document.getElementById('blockquote-color').value = styleConfig.emphasis.blockquote.color;
+                document.getElementById('blockquote-color-hex').value = styleConfig.emphasis.blockquote.color;
+                document.getElementById('blockquote-bg-color').value = styleConfig.emphasis.blockquote.bgColor;
+                document.getElementById('blockquote-bg-color-hex').value = styleConfig.emphasis.blockquote.bgColor;
+                document.getElementById('blockquote-border-color').value = styleConfig.emphasis.blockquote.borderColor;
+                document.getElementById('blockquote-border-color-hex').value = styleConfig.emphasis.blockquote.borderColor;
+                blockquoteColorMode.value = styleConfig.emphasis.blockquote.colorMode;
+                document.querySelectorAll('.blockquote-color-group').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`blockquote-color-${styleConfig.emphasis.blockquote.colorMode}`).classList.remove('hidden');
+                updateColorList('blockquote', styleConfig.emphasis.blockquote.colors);
+                updateRandomColorDisplay('blockquote', styleConfig.emphasis.blockquote.randomColors);
+                document.getElementById('blockquote-random-count').value = styleConfig.emphasis.blockquote.randomCount || 3;
+                
+                // 更新强调设置 - 列表
+                document.getElementById('list-color').value = styleConfig.emphasis.list.color;
+                document.getElementById('list-color-hex').value = styleConfig.emphasis.list.color;
+                document.getElementById('list-marker-color').value = styleConfig.emphasis.list.markerColor;
+                document.getElementById('list-marker-color-hex').value = styleConfig.emphasis.list.markerColor;
+                document.getElementById('list-bold').checked = styleConfig.emphasis.list.bold;
+                listColorMode.value = styleConfig.emphasis.list.colorMode;
+                document.querySelectorAll('.list-color-group').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`list-color-${styleConfig.emphasis.list.colorMode}`).classList.remove('hidden');
+                updateColorList('list', styleConfig.emphasis.list.colors);
+                updateRandomColorDisplay('list', styleConfig.emphasis.list.randomColors);
+                document.getElementById('list-random-count').value = styleConfig.emphasis.list.randomCount || 3;
+                
+                // 更新代码设置
+                document.getElementById('code-color').value = styleConfig.code.inlineColor;
+                document.getElementById('code-bg-color').value = styleConfig.code.inlineBgColor;
+                document.getElementById('code-block-theme').value = styleConfig.code.blockTheme;
+                
+                // 更新其他设置
+                document.getElementById('link-color').value = styleConfig.other.linkColor;
+                document.getElementById('link-color-hex').value = styleConfig.other.linkColor;
+                document.getElementById('hr-style').value = styleConfig.other.hrStyle;
+                document.getElementById('hr-color').value = styleConfig.other.hrColor;
+                document.getElementById('hr-color-hex').value = styleConfig.other.hrColor;
+                
+                // 更新文章顶部和底部模板信息
+                if (styleConfig.templates.top.useTemplate) {
+                    document.getElementById('top-template-info').classList.remove('hidden');
+                    document.getElementById('top-template-name').textContent = styleConfig.templates.top.templateName || "已自定义";
+                    document.getElementById('top-template-preview').classList.remove('hidden');
+                    document.getElementById('top-template-preview').innerHTML = styleConfig.templates.top.templateContent;
+                } else {
+                    document.getElementById('top-template-info').classList.add('hidden');
+                    document.getElementById('top-template-preview').classList.add('hidden');
+                }
+                
+                if (styleConfig.templates.bottom.useTemplate) {
+                    document.getElementById('bottom-template-info').classList.remove('hidden');
+                    document.getElementById('bottom-template-name').textContent = styleConfig.templates.bottom.templateName || "已自定义";
+                    document.getElementById('bottom-template-preview').classList.remove('hidden');
+                    document.getElementById('bottom-template-preview').innerHTML = styleConfig.templates.bottom.templateContent;
+                } else {
+                    document.getElementById('bottom-template-info').classList.add('hidden');
+                    document.getElementById('bottom-template-preview').classList.add('hidden');
+                }
+            }
+            
+            // 更新多色列表
+            function updateColorList(type, colors) {
+                let colorsList;
+                switch(type) {
+                    case 'p':
+                        colorsList = document.getElementById('p-colors-list');
+                        break;
+                    case 'strong':
+                        colorsList = document.getElementById('strong-colors-list');
+                        break;
+                    case 'em':
+                        colorsList = document.getElementById('em-colors-list');
+                        break;
+                    case 'blockquote':
+                        colorsList = document.getElementById('blockquote-colors-list');
+                        break;
+                    case 'list':
+                        colorsList = document.getElementById('list-colors-list');
+                        break;
+                }
+                
+                if (!colorsList || !colors) return;
+                
+                colorsList.innerHTML = '';
+                
+                colors.forEach((color, index) => {
+                    const colorItem = document.createElement('div');
+                    colorItem.className = 'flex items-center justify-between gap-2 p-1 bg-white dark:bg-gray-700 rounded border dark:border-gray-600';
+                    colorItem.dataset.color = color;
+                    colorItem.innerHTML = `
+                        <div class="flex items-center gap-2 flex-1">
+                            <div class="w-6 h-6 rounded" style="background-color: ${color}"></div>
+                            <input type="text" value="${color}" class="flex-1 p-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary dark:bg-gray-600 dark:border-gray-500">
+                        </div>
+                        <button class="remove-color text-red-500 hover:text-red-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 20 20" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    `;
+                    
+                    // 绑定事件
+                    const colorInput = colorItem.querySelector('input');
+                    colorInput.addEventListener('input', (e) => {
+                        const newColor = e.target.value;
+                        const index = Array.from(colorsList.children).indexOf(colorItem);
+                        if (index !== -1) {
+                            // 更新对应的配置
+                            switch(type) {
+                                case 'p':
+                                    styleConfig.paragraph.colors[index] = newColor;
+                                    break;
+                                case 'strong':
+                                    styleConfig.emphasis.strong.colors[index] = newColor;
+                                    break;
+                                case 'em':
+                                    styleConfig.emphasis.em.colors[index] = newColor;
+                                    break;
+                                case 'blockquote':
+                                    styleConfig.emphasis.blockquote.colors[index] = newColor;
+                                    break;
+                                case 'list':
+                                    styleConfig.emphasis.list.colors[index] = newColor;
+                                    break;
+                            }
+                            colorItem.querySelector('div.w-6').style.backgroundColor = newColor;
+                            colorItem.dataset.color = newColor;
+                            updatePreview();
+                        }
+                    });
+                    
+                    // 绑定删除按钮事件
+                    const removeBtn = colorItem.querySelector('.remove-color');
+                    removeBtn.addEventListener('click', () => {
+                        const index = Array.from(colorsList.children).indexOf(colorItem);
+                        if (index !== -1) {
+                            // 更新对应的配置
+                            switch(type) {
+                                case 'p':
+                                    styleConfig.paragraph.colors.splice(index, 1);
+                                    break;
+                                case 'strong':
+                                    styleConfig.emphasis.strong.colors.splice(index, 1);
+                                    break;
+                                case 'em':
+                                    styleConfig.emphasis.em.colors.splice(index, 1);
+                                    break;
+                                case 'blockquote':
+                                    styleConfig.emphasis.blockquote.colors.splice(index, 1);
+                                    break;
+                                case 'list':
+                                    styleConfig.emphasis.list.colors.splice(index, 1);
+                                    break;
+                            }
+                            colorsList.removeChild(colorItem);
+                            updatePreview();
+                        }
+                    });
+                    
+                    colorsList.appendChild(colorItem);
+                });
+            }
+            
+            // 更新随机颜色显示
+            function updateRandomColorDisplay(type, colors) {
+                let colorsContainer;
+                switch(type) {
+                    case 'p':
+                        colorsContainer = document.getElementById('p-random-colors');
+                        break;
+                    case 'strong':
+                        colorsContainer = document.getElementById('strong-random-colors');
+                        break;
+                    case 'em':
+                        colorsContainer = document.getElementById('em-random-colors');
+                        break;
+                    case 'blockquote':
+                        colorsContainer = document.getElementById('blockquote-random-colors');
+                        break;
+                    case 'list':
+                        colorsContainer = document.getElementById('list-random-colors');
+                        break;
+                }
+                
+                if (!colorsContainer || !colors) return;
+                
+                colorsContainer.innerHTML = '';
+                
+                colors.forEach(color => {
+                    const colorItem = document.createElement('div');
+                    colorItem.className = 'w-8 h-8 rounded border dark:border-gray-600';
+                    colorItem.style.backgroundColor = color;
+                    colorItem.title = color;
+                    colorsContainer.appendChild(colorItem);
+                });
             }
 
             // 批量处理开始按钮
@@ -4834,7 +5253,7 @@ console.log("格式化完成!");
             }
             // 根据机器码和盐生成激活码：格式  XXXX-XXXX-XXXX-XXXX-<days>
             function generateCode(mid, days){
-                const hash = CryptoJS.SHA256(normalizeMid(mid) + secretSalt + days).toString().toUpperCase();
+                const hash = CryptoJS.SHA256(mid + secretSalt + days).toString().toUpperCase();
                 return hash.substr(0,16).match(/.{1,4}/g).join('-') + '-' + days;
             }
             // 从激活码解析有效期（天）
@@ -4849,13 +5268,8 @@ console.log("格式化完成!");
                 const days = getDays(code);
                 if(!days) return false;
                 const hashPart = code.trim().toUpperCase().split('-').slice(0,4).join('');
-                const expected = CryptoJS.SHA256(normalizeMid(getMachineId()) + secretSalt + days).toString().toUpperCase().substr(0,16);
+                const expected = CryptoJS.SHA256(getMachineId() + secretSalt + days).toString().toUpperCase().substr(0,16);
                 return hashPart === expected;
-            }
-
-            // 去除所有非 16 进制字符（包括连字符），并转大写
-            function normalizeMid(mid){
-                return mid.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
             }
 
             // DOM Ready
@@ -4878,11 +5292,7 @@ console.log("格式化完成!");
                     showLicenseInfo();
                 }else{
                     overlay.style.display = 'flex';
-                    function formatDisplay(mid){return normalizeMid(mid).match(/.{1,4}/g).join('-');}
-                    machineSpan.textContent = formatDisplay(getMachineId());
-                    if(window.HWA_FP_READY){
-                        window.HWA_FP_READY.then(()=>{machineSpan.textContent=formatDisplay(getMachineId());});
-                    }
+                    machineSpan.textContent = getMachineId();
                 }
 
                 btn && btn.addEventListener('click',()=>{
@@ -4939,57 +5349,14 @@ console.log("格式化完成!");
         }catch(e){console.error(e)}
       }
     </script>
-
+    <!-- 禁止 Ctrl+S 保存网页 -->
     <script>
-    document.addEventListener('keydown',function(e){
-      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){
-         e.preventDefault();            // 阻止默认保存
-         e.stopPropagation();
-         alert('已禁用页面保存功能');
-      }
-    });
-    </script>
-
-    <script>
-      // ===== 模板与颜色辅助函数（恢复） =====
-      function updateTemplateList(){
-        if(!window.templateList) return;
-        templateList.innerHTML='';
-        if(Object.keys(savedTemplates).length===0){templateList.innerHTML='<div class="text-gray-500 italic dark:text-gray-400">暂无保存的模板</div>';return;}
-        const filter=(document.getElementById('template-filter')||{}).value||'all';
-        for(const [name,data] of Object.entries(savedTemplates)){
-          if(filter!=='all'&&data.type!==filter) continue;
-          const date=new Date(data.timestamp||Date.now());
-          const formatted=`${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
-          const item=document.createElement('div');
-          item.className='bg-white dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow duration-200';
-          if(data.type==='built-in') item.classList.add('border-l-4','border-l-primary');
-          item.innerHTML=`<div class='flex flex-col space-y-2'>
-            <div class='flex justify-between items-start'>
-              <div>
-                <div class='font-medium text-lg'>${name}</div>
-                <div class='text-xs text-gray-500 dark:text-gray-400'>${data.type==='built-in'?'<span class="bg-primary text-white px-1 py-0.5 rounded text-xs mr-1">内置</span>':'<span class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs mr-1">自定义</span>'}${formatted}</div>
-              </div>
-              <div class='flex gap-1'>
-                <button class='apply-template bg-primary text-white p-1 rounded-md text-sm hover:bg-primary-dark' data-name='${name}' title='应用此模板'>应用</button>
-                ${data.type!=='built-in'?`<button class='delete-template bg-red-500 text-white p-1 rounded-md text-sm hover:bg-red-600' data-name='${name}' title='删除此模板'>删</button>`:''}
-              </div>
-            </div>
-            ${data.description?`<p class='text-sm text-gray-600 dark:text-gray-300'>${data.description}</p>`:''}
-          </div>`;
-          templateList.appendChild(item);
+      document.addEventListener('keydown',function(e){
+        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){
+          e.preventDefault();
+          e.stopPropagation();
+          alert('已禁用页面保存功能');
         }
-        document.querySelectorAll('.apply-template').forEach(btn=>btn.onclick=()=>applyTemplate(btn.dataset.name));
-        document.querySelectorAll('.delete-template').forEach(btn=>btn.onclick=()=>{const n=btn.dataset.name;if(confirm(`确定删除模板\"${n}\"?`)){delete savedTemplates[n];updateTemplateList();updateBatchTemplateList();populateTemplateCheckboxes&&populateTemplateCheckboxes();showNotification&&showNotification(`已删除模板 ${n}`);}});
-      }
-      function updateBatchTemplateList(){const sel=document.getElementById('batch-template');if(!sel)return;sel.innerHTML='<option value="">使用当前样式</option>';Object.keys(savedTemplates).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});}
-      function updateUIFromConfig(){try{centerContent.checked=styleConfig.global.centerContent;lineHeight.value=styleConfig.global.lineHeight;lineHeightValue.textContent=styleConfig.global.lineHeight;letterSpacing.value=styleConfig.global.letterSpacing;letterSpacingValue.textContent=styleConfig.global.letterSpacing+'em';pFontSize.value=styleConfig.paragraph.fontSize;pFontSizeValue.textContent=styleConfig.paragraph.fontSize+'px';pColor.value=styleConfig.paragraph.color;pColorHex.value=styleConfig.paragraph.color;}catch(e){console.warn('updateUIFromConfig error',e);}}
-      function updateColorList(type,colors){let el;switch(type){case'p':el=document.getElementById('p-colors-list');break;case'strong':el=document.getElementById('strong-colors-list');break;case'em':el=document.getElementById('em-colors-list');break;case'blockquote':el=document.getElementById('blockquote-colors-list');break;case'list':el=document.getElementById('list-colors-list');break;}if(!el)return;el.innerHTML='';(colors||[]).forEach(c=>{const d=document.createElement('div');d.className='w-6 h-6 rounded border';d.style.backgroundColor=c;d.title=c;el.appendChild(d);});}
-      function updateRandomColorDisplay(type,colors){let box;switch(type){case'p':box=document.getElementById('p-random-colors');break;case'strong':box=document.getElementById('strong-random-colors');break;case'em':box=document.getElementById('em-random-colors');break;case'blockquote':box=document.getElementById('blockquote-random-colors');break;case'list':box=document.getElementById('list-random-colors');break;}if(!box)return;box.innerHTML='';(colors||[]).forEach(c=>{const d=document.createElement('div');d.className='w-6 h-6 rounded border';d.style.backgroundColor=c;d.title=c;box.appendChild(d);});}
-      // 绑定筛选/刷新按钮
-      document.getElementById('template-filter')?.addEventListener('change',updateTemplateList);
-      document.getElementById('refresh-templates')?.addEventListener('click',updateTemplateList);
+      });
     </script>
-
-    <!-- =========  何武昂工作室 • 激活码验证系统  ========= -->
 </body></html>
