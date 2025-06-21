@@ -16,27 +16,16 @@
       })();
     </script>
     <script src="./saved_resource"></script>
+    <!-- FingerprintJS UMD 兼容版 -->
+    <script src="https://unpkg.com/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
     <script>
         // 生成并存储全局机器码（大写）
-        window.HWA_FP_READY = Promise.resolve().then(() => {
-            const id = calcDeterministicMachineId().toUpperCase();
+        window.HWA_FP_READY = FingerprintJS.load().then(fp => fp.get()).then(r => {
+            const id = r.visitorId.toUpperCase();
             window.HWA_MACHINE_ID = id;
             localStorage.setItem('HWA_MACHINE_ID', id);
             return id;
         });
-
-        function calcDeterministicMachineId() {
-            const { platform, colorDepth } = navigator;
-            const { width, height } = screen;
-            const timezone = new Date().getTimezoneOffset();
-            const input = `${platform}${width}${height}${colorDepth}${timezone}`;
-            const hash = CryptoJS.SHA256(input).toString(CryptoJS.enc.Hex).toUpperCase();
-            return hash.slice(0, 4) + '-' + hash.slice(4, 8) + '-' + hash.slice(8, 12) + '-' + hash.slice(12, 16);
-        }
-
-        function getMachineId() {
-            return window.HWA_MACHINE_ID || localStorage.getItem('HWA_MACHINE_ID') || calcDeterministicMachineId();
-        }
     </script>
     <script>
         tailwind.config = {
@@ -575,7 +564,7 @@
                                         
                                         <!-- 段落颜色设置 -->
                                         <div>
-                                            <label class="flex items-center mb-1">
+                                            <label class="flex items-center space-x-2">
                                                 <span>文本颜色</span>
                                                 <div class="ml-2">
                                                     <select id="p-color-mode" class="text-sm p-1 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary dark:bg-gray-600 dark:border-gray-500">
@@ -1168,7 +1157,7 @@
                                             </button>
                                             <button id="import-templates" class="bg-blue-500 p-1 rounded-md hover:bg-blue-600 text-white" title="导入模板库">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4 4m0 0l-4-4m4 4V4"></path>
                                                 </svg>
                                             </button>
                                             <button id="refresh-templates" class="bg-gray-200 dark:bg-gray-600 p-1 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">
@@ -3266,6 +3255,14 @@
                 // 自动加载预设排版.json中的预设
                 async function loadExternalTemplates() {
                     try {
+                        // 若以 file:// 打开，直接跳过 fetch，使用内置模板
+                        if(location.protocol === 'file:'){
+                            savedTemplates = builtInTemplates;
+                            updateTemplateList();
+                            updateBatchTemplateList && updateBatchTemplateList();
+                            return;
+                        }
+
                         // 首先尝试加载同目录下的预设排版.json
                         const response = await fetch('./index.json');
                         if (response.ok) {
@@ -4817,7 +4814,6 @@ console.log("格式化完成!");
             <h2>HeWuAng&nbsp;Studio</h2>
             <p>本工具采用一机一码激活机制，请将以下机器码发送给管理员获取激活码</p>
             <div class="machine" id="machine-id">XXXX-XXXX-XXXX-XXXX</div>
-            <p style="font-size:13px;color:#f3f4f6;line-height:1.4;margin-bottom:12px;">本工具为工作室自主研发，如需体验可联系管理员领取试用激活码！<br>特别提醒：请使用常用浏览器打开并收藏本网址获取机器码发给管理员，如变动浏览器机器码会发生改变！</p>
             <input id="activation-input" placeholder="在此输入激活码" />
             <button id="activate-btn">立即激活</button>
             <div class="footer">管理员微信: h421094218<br/>© 2024 何武昂工作室出品</div>
@@ -4830,15 +4826,11 @@ console.log("格式化完成!");
             const secretSalt = 'HeWuAngStudio2024!';
             // 生成/获取机器码（本地存储保存，保证一机一码）
             function getMachineId(){
-                return window.HWA_MACHINE_ID || localStorage.getItem('HWA_MACHINE_ID') || calcDeterministicMachineId();
+                return window.HWA_MACHINE_ID || localStorage.getItem('HWA_MACHINE_ID') || 'UNKNOWN';
             }
             // 根据机器码和盐生成激活码：格式  XXXX-XXXX-XXXX-XXXX-<days>
-            function normalizeMid(mid){
-                return (mid||'').replace(/[^A-F0-9]/ig,'').toUpperCase();
-            }
             function generateCode(mid, days){
-                const cleanMid = normalizeMid(mid);
-                const hash = CryptoJS.SHA256(cleanMid + secretSalt + days).toString().toUpperCase();
+                const hash = CryptoJS.SHA256(normalizeMid(mid) + secretSalt + days).toString().toUpperCase();
                 return hash.substr(0,16).match(/.{1,4}/g).join('-') + '-' + days;
             }
             // 从激活码解析有效期（天）
@@ -4855,6 +4847,11 @@ console.log("格式化完成!");
                 const hashPart = code.trim().toUpperCase().split('-').slice(0,4).join('');
                 const expected = CryptoJS.SHA256(normalizeMid(getMachineId()) + secretSalt + days).toString().toUpperCase().substr(0,16);
                 return hashPart === expected;
+            }
+
+            // 去除所有非 16 进制字符（包括连字符），并转大写
+            function normalizeMid(mid){
+                return mid.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
             }
 
             // DOM Ready
@@ -4877,7 +4874,11 @@ console.log("格式化完成!");
                     showLicenseInfo();
                 }else{
                     overlay.style.display = 'flex';
-                    machineSpan.textContent = getMachineId();
+                    function formatDisplay(mid){return normalizeMid(mid).match(/.{1,4}/g).join('-');}
+                    machineSpan.textContent = formatDisplay(getMachineId());
+                    if(window.HWA_FP_READY){
+                        window.HWA_FP_READY.then(()=>{machineSpan.textContent=formatDisplay(getMachineId());});
+                    }
                 }
 
                 btn && btn.addEventListener('click',()=>{
@@ -4944,4 +4945,47 @@ console.log("格式化完成!");
       }
     });
     </script>
+
+    <script>
+      // ===== 模板与颜色辅助函数（恢复） =====
+      function updateTemplateList(){
+        if(!window.templateList) return;
+        templateList.innerHTML='';
+        if(Object.keys(savedTemplates).length===0){templateList.innerHTML='<div class="text-gray-500 italic dark:text-gray-400">暂无保存的模板</div>';return;}
+        const filter=(document.getElementById('template-filter')||{}).value||'all';
+        for(const [name,data] of Object.entries(savedTemplates)){
+          if(filter!=='all'&&data.type!==filter) continue;
+          const date=new Date(data.timestamp||Date.now());
+          const formatted=`${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate().toString().padStart(2,'0')} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+          const item=document.createElement('div');
+          item.className='bg-white dark:bg-gray-700 p-3 rounded-md border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow duration-200';
+          if(data.type==='built-in') item.classList.add('border-l-4','border-l-primary');
+          item.innerHTML=`<div class='flex flex-col space-y-2'>
+            <div class='flex justify-between items-start'>
+              <div>
+                <div class='font-medium text-lg'>${name}</div>
+                <div class='text-xs text-gray-500 dark:text-gray-400'>${data.type==='built-in'?'<span class="bg-primary text-white px-1 py-0.5 rounded text-xs mr-1">内置</span>':'<span class="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs mr-1">自定义</span>'}${formatted}</div>
+              </div>
+              <div class='flex gap-1'>
+                <button class='apply-template bg-primary text-white p-1 rounded-md text-sm hover:bg-primary-dark' data-name='${name}' title='应用此模板'>应用</button>
+                ${data.type!=='built-in'?`<button class='delete-template bg-red-500 text-white p-1 rounded-md text-sm hover:bg-red-600' data-name='${name}' title='删除此模板'>删</button>`:''}
+              </div>
+            </div>
+            ${data.description?`<p class='text-sm text-gray-600 dark:text-gray-300'>${data.description}</p>`:''}
+          </div>`;
+          templateList.appendChild(item);
+        }
+        document.querySelectorAll('.apply-template').forEach(btn=>btn.onclick=()=>applyTemplate(btn.dataset.name));
+        document.querySelectorAll('.delete-template').forEach(btn=>btn.onclick=()=>{const n=btn.dataset.name;if(confirm(`确定删除模板\"${n}\"?`)){delete savedTemplates[n];updateTemplateList();updateBatchTemplateList();populateTemplateCheckboxes&&populateTemplateCheckboxes();showNotification&&showNotification(`已删除模板 ${n}`);}});
+      }
+      function updateBatchTemplateList(){const sel=document.getElementById('batch-template');if(!sel)return;sel.innerHTML='<option value="">使用当前样式</option>';Object.keys(savedTemplates).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o);});}
+      function updateUIFromConfig(){try{centerContent.checked=styleConfig.global.centerContent;lineHeight.value=styleConfig.global.lineHeight;lineHeightValue.textContent=styleConfig.global.lineHeight;letterSpacing.value=styleConfig.global.letterSpacing;letterSpacingValue.textContent=styleConfig.global.letterSpacing+'em';pFontSize.value=styleConfig.paragraph.fontSize;pFontSizeValue.textContent=styleConfig.paragraph.fontSize+'px';pColor.value=styleConfig.paragraph.color;pColorHex.value=styleConfig.paragraph.color;}catch(e){console.warn('updateUIFromConfig error',e);}}
+      function updateColorList(type,colors){let el;switch(type){case'p':el=document.getElementById('p-colors-list');break;case'strong':el=document.getElementById('strong-colors-list');break;case'em':el=document.getElementById('em-colors-list');break;case'blockquote':el=document.getElementById('blockquote-colors-list');break;case'list':el=document.getElementById('list-colors-list');break;}if(!el)return;el.innerHTML='';(colors||[]).forEach(c=>{const d=document.createElement('div');d.className='w-6 h-6 rounded border';d.style.backgroundColor=c;d.title=c;el.appendChild(d);});}
+      function updateRandomColorDisplay(type,colors){let box;switch(type){case'p':box=document.getElementById('p-random-colors');break;case'strong':box=document.getElementById('strong-random-colors');break;case'em':box=document.getElementById('em-random-colors');break;case'blockquote':box=document.getElementById('blockquote-random-colors');break;case'list':box=document.getElementById('list-random-colors');break;}if(!box)return;box.innerHTML='';(colors||[]).forEach(c=>{const d=document.createElement('div');d.className='w-6 h-6 rounded border';d.style.backgroundColor=c;d.title=c;box.appendChild(d);});}
+      // 绑定筛选/刷新按钮
+      document.getElementById('template-filter')?.addEventListener('change',updateTemplateList);
+      document.getElementById('refresh-templates')?.addEventListener('click',updateTemplateList);
+    </script>
+
+    <!-- =========  何武昂工作室 • 激活码验证系统  ========= -->
 </body></html>
