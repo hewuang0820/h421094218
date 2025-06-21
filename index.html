@@ -16,17 +16,6 @@
       })();
     </script>
     <script src="./saved_resource"></script>
-    <!-- FingerprintJS — 生成跨浏览器稳定机器码 -->
-    <script src="https://openfpcdn.io/fingerprintjs/v3"></script>
-    <script>
-        // 生成并存储全局机器码（大写）
-        window.HWA_FP_READY = FingerprintJS.load().then(fp => fp.get()).then(r => {
-            const id = r.visitorId.toUpperCase();
-            window.HWA_MACHINE_ID = id;
-            localStorage.setItem('HWA_MACHINE_ID', id);
-            return id;
-        });
-    </script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -5249,7 +5238,12 @@ console.log("格式化完成!");
             const secretSalt = 'HeWuAngStudio2024!';
             // 生成/获取机器码（本地存储保存，保证一机一码）
             function getMachineId(){
-                return window.HWA_MACHINE_ID || localStorage.getItem('HWA_MACHINE_ID') || 'UNKNOWN';
+                let mid = localStorage.getItem('HWA_MACHINE_ID');
+                if(!mid){
+                    mid = CryptoJS.SHA256(navigator.userAgent + Date.now() + Math.random()).toString().substr(0,16).toUpperCase();
+                    localStorage.setItem('HWA_MACHINE_ID', mid);
+                }
+                return mid;
             }
             // 根据机器码和盐生成激活码：格式  XXXX-XXXX-XXXX-XXXX-<days>
             function generateCode(mid, days){
@@ -5348,15 +5342,5 @@ console.log("格式化完成!");
           setInterval(update,60000);
         }catch(e){console.error(e)}
       }
-    </script>
-    <!-- 禁止 Ctrl+S 保存网页 -->
-    <script>
-      document.addEventListener('keydown',function(e){
-        if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){
-          e.preventDefault();
-          e.stopPropagation();
-          alert('已禁用页面保存功能');
-        }
-      });
     </script>
 </body></html>
