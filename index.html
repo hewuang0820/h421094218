@@ -16,7 +16,9 @@
       })();
     </script>
     <script src="./saved_resource"></script>
-    <!-- CryptoJS 提前加载 -->
+    <!-- 全局模板对象，必须在任何脚本之前定义 -->
+    <script>window.savedTemplates = window.savedTemplates || {};</script>
+    <!-- CryptoJS 提前加载，供后续脚本使用 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <!-- FingerprintJS UMD 兼容版 -->
     <script src="https://unpkg.com/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
