@@ -3243,105 +3243,77 @@
                 
                 // 自动加载预设排版.json中的预设
                 async function loadExternalTemplates() {
-                    try {
-                        // 首先尝试加载同目录下的预设排版.json
-                        const response = await fetch('./index.json');
-                        if (response.ok) {
-                            const externalTemplates = await response.json();
-                            
-                            // 将外部模板转换为内置模板格式
-                            Object.keys(externalTemplates).forEach(templateName => {
-                                const template = externalTemplates[templateName];
-                                builtInTemplates[templateName] = {
-                                    type: "built-in",
-                                    description: template.description || `${templateName}风格设计`,
-                                    styleConfig: template.styleConfig,
-                                    timestamp: template.timestamp || new Date().toISOString()
-                                };
-                            });
-                            
-                            console.log(`✅ 成功加载 ${Object.keys(externalTemplates).length} 个外部排版预设`);
-                            
-                            // 显示加载的模板名称
-                            const templateNames = Object.keys(externalTemplates);
-                            console.log('📋 已加载的模板:', templateNames.join(', '));
-                            
-                        } else {
-                            console.warn('⚠️ 无法加载同目录下的预设排版.json文件，尝试根目录路径');
-                            
-                            // 如果排版工具目录下没有，尝试根目录
-                            try {
-                                const rootResponse = await fetch('./index.json');
-                                if (rootResponse.ok) {
-                                    const externalTemplates = await rootResponse.json();
-                                    
-                                    // 将外部模板转换为内置模板格式
-                                    Object.keys(externalTemplates).forEach(templateName => {
-                                        const template = externalTemplates[templateName];
-                                        builtInTemplates[templateName] = {
-                                            type: "built-in",
-                                            description: template.description || `${templateName}风格设计`,
-                                            styleConfig: template.styleConfig,
-                                            timestamp: template.timestamp || new Date().toISOString()
-                                        };
-                                    });
-                                    
-                                    console.log(`✅ 成功从根目录加载 ${Object.keys(externalTemplates).length} 个外部排版预设`);
-                                } else {
-                                    console.warn('⚠️ 根目录下也没有 index.json 文件，使用默认模板');
-                                }
-                            } catch(rootError) {
-                                console.warn('❌ 根目录加载失败:', rootError.message);
-                            }
+                    // 依次尝试多个路径
+                    const paths = (()=>{
+                        const arr = [];
+                        // 1) 站点根目录
+                        if(location.origin && location.origin !== 'null') arr.push(`${location.origin}/index.json`);
+                        // 2) 当前目录起，递归向上 3 层
+                        let prefix = './';
+                        for(let i=0;i<4;i++){
+                            arr.push(prefix + 'index.json');
+                            prefix = '../' + prefix;
                         }
-                    } catch (error) {
-                        console.warn('❌ 加载外部模板时出错:', error.message);
-                        // 尝试从根目录位置加载
+                        // 3) 绝对根相对
+                        arr.push('/index.json');
+                        // 4) 远程静态备份 (与卡密 API 同主机)
+                        arr.push('http://170.106.175.187/index.json');
+                        return arr;
+                    })();
+                    let externalTemplates = null;
+
+                    for (const p of paths) {
                         try {
-                            const fallbackResponse = await fetch('./index.json');
-                            if (fallbackResponse.ok) {
-                                const externalTemplates = await fallbackResponse.json();
-                                
-                                // 将外部模板转换为内置模板格式
-                                Object.keys(externalTemplates).forEach(templateName => {
-                                    const template = externalTemplates[templateName];
-                                    builtInTemplates[templateName] = {
-                                        type: "built-in",
-                                        description: template.description || `${templateName}风格设计`,
-                                        styleConfig: template.styleConfig,
-                                        timestamp: template.timestamp || new Date().toISOString()
-                                    };
-                                });
-                                
-                                console.log(`✅ 成功加载 ${Object.keys(externalTemplates).length} 个外部排版预设（备用路径）`);
-                            } else {
-                                console.warn('⚠️ 所有路径均无法加载 index.json 文件，使用默认模板');
-                            }
-                        } catch(fallbackError) {
-                            console.warn('❌ 备用路径加载也失败:', fallbackError.message);
-                        }
-                    } finally {
-                        // 设置最终的模板列表
-                        savedTemplates = builtInTemplates;
-                        updateTemplateList();
-                        updateBatchTemplateList();
-                        
-                        // 在页面加载时应用第一个筛选模板（如果有）
-                        setTimeout(() => {
-                            const templateNames = Object.keys(savedTemplates);
-                            if (templateNames.length > 3) { // 如果有超过基本模板的模板
-                                // 找到第一个非默认模板
-                                const nonDefaultTemplates = templateNames.filter(name => 
-                                    !['深色专业', '多彩活泼', '优雅简约'].includes(name));
-                                
-                                if (nonDefaultTemplates.length > 0) {
-                                    console.log('🔄 自动应用筛选模板:', nonDefaultTemplates[0]);
-                                    // 使用应用模板函数
-                                    applyTemplate(nonDefaultTemplates[0]);
+                            const isHttp = p.startsWith('http://') || p.startsWith('https://');
+                            const res = await fetch(p, { cache: 'no-cache', mode: isHttp ? 'no-cors' : 'same-origin' });
+                            if (res.ok || res.status === 0) {
+                                // file:// 场景 status === 0 且 type==='opaque'
+                                let jsonText;
+                                try {
+                                    jsonText = await res.text();
+                                    externalTemplates = JSON.parse(jsonText);
+                                    console.log(`✅ 模板文件已加载: ${p}`);
+                                    break;
+                                } catch(e){
+                                    // 解析失败则继续下一个路径
                                 }
                             }
-                        }, 1000); // 延迟1秒，确保界面已完全加载
+                        } catch (_) {
+                            // 跳过错误，继续尝试下一个路径
+                        }
                     }
+
+                    if (externalTemplates) {
+                        Object.keys(externalTemplates).forEach(templateName => {
+                            const template = externalTemplates[templateName];
+                            builtInTemplates[templateName] = {
+                                type: 'built-in',
+                                description: template.description || `${templateName}风格设计`,
+                                styleConfig: template.styleConfig,
+                                timestamp: template.timestamp || new Date().toISOString()
+                            };
+                        });
+                        console.log(`📋 已加载的模板: ${Object.keys(externalTemplates).join(', ')}`);
+                    } else {
+                        console.warn('⚠️ 未找到 index.json，使用默认模板');
+                    }
+
+                    // 设置最终模板列表并刷新 UI
+                    savedTemplates = builtInTemplates;
+                    updateTemplateList();
+                    updateBatchTemplateList();
+
+                    // 自动应用第一个自定义模板（如有）
+                    setTimeout(() => {
+                        const templateNames = Object.keys(savedTemplates);
+                        if (templateNames.length > 3) {
+                            const nonDefault = templateNames.filter(n => !['深色专业','多彩活泼','优雅简约'].includes(n));
+                            if (nonDefault.length) {
+                                console.log('🔄 自动应用筛选模板:', nonDefault[0]);
+                                applyTemplate(nonDefault[0]);
+                            }
+                        }
+                    }, 1000);
                 }
                 
                 // 执行异步加载
@@ -5224,9 +5196,9 @@ console.log("格式化完成!");
     <div id="license-overlay">
         <div class="panel">
             <h2>HeWuAng&nbsp;Studio</h2>
-            <p>本工具采用一机一码激活机制，请将以下机器码发送给管理员获取激活码</p>
+            <p>本工具采用一机一码验证机制，请将以下机器码发送给管理员获取<strong>卡密</strong></p>
             <div class="machine" id="machine-id">XXXX-XXXX-XXXX-XXXX</div>
-            <input id="activation-input" placeholder="在此输入激活码" />
+            <input id="activation-input" placeholder="在此输入卡密" />
             <button id="activate-btn">立即激活</button>
             <div class="footer">管理员微信: h421094218<br/>© 2024 何武昂工作室出品</div>
         </div>
@@ -5235,7 +5207,9 @@ console.log("格式化完成!");
     <!-- 激活脚本 -->
     <script>
         (function(){
-            const secretSalt = 'HeWuAngStudio2024!';
+            const API_URL = 'http://api/card-keys/verify';
+            const STORAGE_KEY = 'HWA_VERIFICATION';
+
             // 生成/获取机器码（本地存储保存，保证一机一码）
             function getMachineId(){
                 let mid = localStorage.getItem('HWA_MACHINE_ID');
@@ -5245,25 +5219,32 @@ console.log("格式化完成!");
                 }
                 return mid;
             }
-            // 根据机器码和盐生成激活码：格式  XXXX-XXXX-XXXX-XXXX-<days>
-            function generateCode(mid, days){
-                const hash = CryptoJS.SHA256(mid + secretSalt + days).toString().toUpperCase();
-                return hash.substr(0,16).match(/.{1,4}/g).join('-') + '-' + days;
+
+            // 加密验证信息
+            function encrypt(data){
+                return CryptoJS.AES.encrypt(JSON.stringify(data), getMachineId()).toString();
             }
-            // 从激活码解析有效期（天）
-            function getDays(code){
-                const arr = (code||'').trim().toUpperCase().split('-');
-                if(arr.length < 5) return null;
-                const d = parseInt(arr[arr.length-1]);
-                return isNaN(d) ? null : d;
+            // 解密验证信息
+            function decrypt(cipher){
+                try{
+                    const bytes = CryptoJS.AES.decrypt(cipher, getMachineId());
+                    return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+                }catch(e){return null;}
             }
-            // 校验激活码
-            function isValid(code){
-                const days = getDays(code);
-                if(!days) return false;
-                const hashPart = code.trim().toUpperCase().split('-').slice(0,4).join('');
-                const expected = CryptoJS.SHA256(getMachineId() + secretSalt + days).toString().toUpperCase().substr(0,16);
-                return hashPart === expected;
+
+            function loadVerification(){
+                const cipher = localStorage.getItem(STORAGE_KEY);
+                return cipher ? decrypt(cipher) : null;
+            }
+
+            function saveVerification(data){
+                localStorage.setItem(STORAGE_KEY, encrypt(data));
+            }
+
+            function isVerified(){
+                const info = loadVerification();
+                if(!info) return false;
+                return new Date(info.expiryTime).getTime() > Date.now();
             }
 
             // DOM Ready
@@ -5273,40 +5254,51 @@ console.log("格式化完成!");
                 const input = document.getElementById('activation-input');
                 const btn = document.getElementById('activate-btn');
 
-                const storedCode = localStorage.getItem('HWA_ACT_CODE');
-                const storedDays = parseInt(localStorage.getItem('HWA_ACT_DAYS')||0);
-                const activated = storedCode && isValid(storedCode);
+                machineSpan.textContent = getMachineId();
 
-                if(activated){
-                    // 若未记录激活时间，补录当前时间
-                    if(!localStorage.getItem('HWA_ACT_TS')){
-                        localStorage.setItem('HWA_ACT_TS', Date.now());
-                    }
+                if(isVerified()){
                     overlay.style.display = 'none';
                     showLicenseInfo();
                 }else{
                     overlay.style.display = 'flex';
-                    machineSpan.textContent = getMachineId();
                 }
 
-                btn && btn.addEventListener('click',()=>{
-                    const code = input.value.trim().toUpperCase();
-                    if(isValid(code)){
-                        const days = getDays(code) || 365;
-                        localStorage.setItem('HWA_ACT_CODE', code);
-                        localStorage.setItem('HWA_ACT_DAYS', days);
-                        localStorage.setItem('HWA_ACT_TS', Date.now());
-                        alert('🎉 激活成功! 感谢您的支持');
-                        overlay.style.display='none';
-                        showLicenseInfo();
-                    }else{
-                        alert('❌ 激活码无效，请检查后重试');
+                btn && btn.addEventListener('click', async ()=>{
+                    const key = input.value.trim();
+                    if(!key){
+                        alert('请输入卡密');
+                        return;
+                    }
+                    btn.disabled = true;
+                    const originalText = btn.textContent;
+                    btn.textContent = '验证中...';
+                    try{
+                        const res = await fetch(API_URL, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({key, userIdentifier: getMachineId()})
+                        });
+                        const result = await res.json();
+                        if(result && result.success){
+                            saveVerification(result.data);
+                            alert('🎉 卡密验证成功! 感谢您的支持');
+                            overlay.style.display = 'none';
+                            showLicenseInfo();
+                        }else{
+                            alert('❌ 验证失败: ' + (result.message || '未知错误'));
+                        }
+                    }catch(err){
+                        console.error(err);
+                        alert('网络错误，无法连接验证服务器');
+                    }finally{
+                        btn.disabled = false;
+                        btn.textContent = originalText;
                     }
                 });
             });
 
-            // 向外暴露生成器所需的辅助函数(仅调试使用)
-            window._HWA_LICENSE = {getMachineId, generateCode};
+            // 向外暴露供其他脚本使用
+            window._HWA_LICENSE = {getMachineId, isVerified, loadVerification};
         })();
     </script>
     <!-- =========  激活系统结束  ========= -->
@@ -5325,19 +5317,36 @@ console.log("格式化完成!");
             bar.style.cssText='position:fixed;bottom:15px;right:15px;padding:8px 14px;background:rgba(17,24,39,.85);color:#f1f5f9;font-size:13px;border-radius:8px;backdrop-filter:blur(4px);z-index:2147483647;user-select:none';
             document.body.appendChild(bar);
           }
-          const DAYS=parseInt(localStorage.getItem("HWA_ACT_DAYS")||365);
-          const ts=parseInt(localStorage.getItem("HWA_ACT_TS")||Date.now());
+
           function update(){
-            const remain=ts+DAYS*86400000-Date.now();
+            const cipher = localStorage.getItem('HWA_VERIFICATION');
+            if(!cipher){
+              bar.textContent='未验证，请先输入卡密';
+              bar.style.background='rgba(185,28,28,.9)';
+              return;
+            }
+            let info;
+            try{
+              info = JSON.parse(CryptoJS.AES.decrypt(cipher, localStorage.getItem('HWA_MACHINE_ID')).toString(CryptoJS.enc.Utf8));
+            }catch(e){
+              console.error(e);
+            }
+            if(!info || !info.expiryTime){
+              bar.textContent='验证信息损坏，请重新验证';
+              bar.style.background='rgba(185,28,28,.9)';
+              return;
+            }
+            const remain = new Date(info.expiryTime).getTime() - Date.now();
             if(remain<=0){
-              bar.textContent='激活已到期，请联系管理员续期';
+              bar.textContent='验证已到期，请联系管理员续期';
               bar.style.background='rgba(185,28,28,.9)';
               return;
             }
             const d=Math.floor(remain/86400000);
             const h=Math.floor((remain%86400000)/3600000);
-            bar.textContent=`激活剩余: ${d}天 ${h}小时`;
+            bar.textContent=`验证剩余: ${d}天 ${h}小时`;
           }
+
           update();
           setInterval(update,60000);
         }catch(e){console.error(e)}
