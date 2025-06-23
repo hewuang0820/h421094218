@@ -7,19 +7,52 @@
 
   // ===== Utils =====
   function sha256(str){return CryptoJS.SHA256(str).toString();}
-  function getMachineId(){
+  function getMachineId () {
+    /* 1) 先查 localStorage */
     let id = localStorage.getItem(MACHINE_KEY);
-    if (!id) {
-      const raw =
-        navigator.platform +                       // Windows NT 10.0 x64
-        screen.width + 'x' + screen.height +       // 1920x1080
-        screen.colorDepth +                        // 24
-        Intl.DateTimeFormat().resolvedOptions().timeZone + // Asia/Shanghai
-        navigator.language;                        // zh-CN
-      id = CryptoJS.SHA256(raw).toString().substr(0, 16).toUpperCase();
-      localStorage.setItem(MACHINE_KEY, id);
+    if (id) return id;
+
+    /* 2) 再查 cookie（Safari 隐私模式 localStorage 不可用但 cookie 可用） */
+    const cookieMatch = document.cookie.match(new RegExp('(?:^|;\\s*)' + MACHINE_KEY + '=([^;]*)'));
+    if (cookieMatch) {
+      id = cookieMatch[1];
+      localStorage.setItem(MACHINE_KEY, id);       // 写回 localStorage
+      return id;
     }
-    return id;
+
+    /* 3) 再查 IndexedDB（跨浏览器共享，但首次读取是异步） */
+    //   如果 500ms 内读不到，就先同步生成一个临时 ID 返回，
+    //   读到后再把最终 ID 覆盖进去，保证首屏不卡。
+    const tempId = crypto.randomUUID().replace(/-/g, '').substr(0, 16).toUpperCase();
+    generateOrReadId((finalId) => {
+      if (!localStorage.getItem(MACHINE_KEY)) {        // 首次生成
+        localStorage.setItem(MACHINE_KEY, finalId);
+        document.cookie = MACHINE_KEY + '=' + finalId + ';path=/;max-age=63072000'; // 2年
+      }
+    });
+    return tempId;
+
+    /* ---------- 内部函数：读/写 IndexedDB ---------- */
+    function generateOrReadId (cb) {
+      const req = indexedDB.open('kami_machine_db', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('kv', 'readwrite');
+        const store = tx.objectStore('kv');
+        const get = store.get('machineId');
+        get.onsuccess = () => {
+          let finalId = get.result;
+          if (!finalId) {
+            finalId = crypto.randomUUID().replace(/-/g, '').substr(0, 16).toUpperCase();
+            store.put(finalId, 'machineId');
+          }
+          cb(finalId);
+        };
+        tx.oncomplete = () => db.close();
+      };
+      req.onerror = () => cb(tempId);   // 如果 IndexedDB 被禁用
+    }
   }
   function encrypt(obj){return CryptoJS.AES.encrypt(JSON.stringify(obj), getMachineId()).toString();}
   function decrypt(cipher){try{return JSON.parse(CryptoJS.AES.decrypt(cipher,getMachineId()).toString(CryptoJS.enc.Utf8));}catch(e){return null;}}
