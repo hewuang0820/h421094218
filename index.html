@@ -5204,6 +5204,38 @@ console.log("格式化完成!");
         });
     </script>
 
+    <!-- ========  何武昂工作室 • 卡密验证系统  ======== -->
+<style>
+  #license-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(10,18,30,.92);display:flex;align-items:center;justify-content:center;z-index:2147483647;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  #license-overlay .panel{background:#1f2937;padding:40px 35px;border-radius:16px;width:90%;max-width:420px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,.4)}
+  #license-overlay input,#license-overlay button{width:100%;padding:12px;border:none;border-radius:6px;font-size:16px;margin-bottom:18px}
+  #license-overlay input{background:#374151;color:#f9fafb}
+  #license-overlay button{background:#2563eb;color:#fff;cursor:pointer;transition:.2s}
+  #license-overlay button:hover{background:#1d4ed8}
+  #license-overlay .footer{font-size:12px;color:#9ca3af;line-height:1.6}
+</style>
+
+<div id="license-overlay" style="display:none">
+  <div class="panel">
+    <h2>HeWuAng&nbsp;Studio</h2>
+    <p>本工具采用一机一码验证机制，请将以下机器码发送给管理员获取<strong>卡密</strong></p>
+    <div id="machine-id" style="background:#111827;padding:10px;border-radius:6px;user-select:all;margin-bottom:20px">XXXX</div>
+    <input id="activation-input" placeholder="在此输入卡密">
+    <button id="activate-btn">立即激活</button>
+    <div class="footer">
+      管理员微信: h421094218<br>
+      <span id="tips">温馨提醒区域，可自行编辑</span><br>
+      © 2024 何武昂工作室 出品
+    </div>
+  </div>
+</div>
+
+<!-- 依赖 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<!-- 核心脚本 -->
+<script src="kami-auth.js"></script>
+<!-- ========  卡密系统结束  ======== -->
+
     <script>
     document.addEventListener('keydown',function(e){
       if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){
