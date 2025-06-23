@@ -34,13 +34,43 @@
       const key=input.value.trim();
       if(!key){alert('请输入卡密');return;}
       btn.disabled=true;const oldText=btn.textContent;btn.textContent='验证中...';
+
+      // 将请求逻辑封装，支持 CORS 代理回退
+      async function requestVerify(url){
+        return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,userIdentifier:getMachineId()})});
+      }
+
       try{
-        const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,userIdentifier:getMachineId()})});
-        const json=await res.json();
-        if(json.success){saveVerify(json.data);overlay.style.display='none';showRemain();}
-        else alert('验证失败:'+json.message);
-      }catch(e){alert('网络错误');}
-      finally{btn.disabled=false;btn.textContent=oldText;}
+        // 第一次直接请求
+        let res=await requestVerify(API_URL);
+        // 若跨域被阻止或服务器返回 4xx/5xx，则尝试使用 CORS 代理重新请求
+        if(!res.ok){throw new Error('status '+res.status);}  
+        let json=await res.json();
+        if(!json.success) throw new Error(json.message||'验证失败');
+
+        // success path
+        saveVerify(json.data||json);
+        overlay.style.display='none';
+        showRemain();
+      }catch(firstErr){
+        console.warn('第一次请求验证接口失败:',firstErr);
+        try{
+          const proxyUrl='https://corsproxy.io/?'+API_URL.replace(/^https?:\/\//,'');
+          const res=await requestVerify(proxyUrl);
+          if(!res.ok){throw new Error('status '+res.status);}  
+          const json=await res.json();
+          if(!json.success) throw new Error(json.message||'验证失败');
+          saveVerify(json.data||json);
+          overlay.style.display='none';
+          showRemain();
+        }catch(secondErr){
+          console.error('验证接口请求失败:',secondErr);
+          alert('❌ 无法连接验证服务器，请检查网络或稍后再试');
+        }
+      }finally{
+        btn.disabled=false;
+        btn.textContent=oldText;
+      }
     });
 
     if(isVerified()){overlay.style.display='none';showRemain();}else overlay.style.display='flex';
