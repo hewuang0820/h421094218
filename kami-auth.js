@@ -23,8 +23,15 @@
 
   // ===== Overlay =====
   function initOverlay(){
-    const overlay=document.getElementById('license-overlay');
-    if(!overlay) return;
+    let overlay=document.getElementById('license-overlay');
+    if(!overlay){
+      // 若页面中没有预置验证层，动态创建一份，避免因 HTML 缺失导致无法验证
+      overlay=document.createElement('div');
+      overlay.id='license-overlay';
+      overlay.style.display='none';
+      overlay.innerHTML=`<div class="panel">\n        <h2>HeWuAng&nbsp;Studio</h2>\n        <p>本工具采用一机一码验证机制，请将以下机器码发送给管理员获取<strong>卡密</strong></p>\n        <div id="machine-id" style="background:rgba(0,0,0,.45);padding:12px 14px;border-radius:8px;margin-bottom:24px;user-select:all">XXXX</div>\n        <input id="activation-input" placeholder="在此输入卡密" />\n        <button id="activate-btn">立即激活</button>\n        <div class="footer">管理员微信: h421094218<br><span id="tips">温馨提醒区域，请用常用浏览器打开保存网站！联系管理员获取激活码！</span><br>© 2024 何武昂工作室 出品</div>\n      </div>`;
+      document.body.appendChild(overlay);
+    }
     const machineSpan=document.getElementById('machine-id');
     const input=document.getElementById('activation-input');
     const btn=document.getElementById('activate-btn');
