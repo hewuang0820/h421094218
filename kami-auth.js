@@ -41,8 +41,14 @@
       }
 
       try{
-        // 第一次直接请求
-        let res=await requestVerify(API_URL);
+        // ==== 兼容 HTTPS 环境：若当前页面为 https 而 API 是 http，会触发 Mixed-Content 阻止。
+        //      这种情况下优先改用 https://corsproxy.io 代理，避免第一步就被浏览器拦截。
+        const firstUrl = (location.protocol === 'https:' && API_URL.startsWith('http://'))
+            ? 'https://corsproxy.io/?' + API_URL.replace(/^http:\/\//, '')
+            : API_URL;
+
+        // 第一次请求（已根据环境决定是否使用代理）
+        let res = await requestVerify(firstUrl);
         // 若跨域被阻止或服务器返回 4xx/5xx，则尝试使用 CORS 代理重新请求
         if(!res.ok){throw new Error('status '+res.status);}  
         let json=await res.json();
