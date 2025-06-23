@@ -9,9 +9,15 @@
   function sha256(str){return CryptoJS.SHA256(str).toString();}
   function getMachineId(){
     let id = localStorage.getItem(MACHINE_KEY);
-    if(!id){
-      id = sha256(navigator.userAgent + navigator.platform + navigator.language).substr(0,16).toUpperCase();
-      localStorage.setItem(MACHINE_KEY,id);
+    if (!id) {
+      const raw =
+        navigator.platform +                       // Windows NT 10.0 x64
+        screen.width + 'x' + screen.height +       // 1920x1080
+        screen.colorDepth +                        // 24
+        Intl.DateTimeFormat().resolvedOptions().timeZone + // Asia/Shanghai
+        navigator.language;                        // zh-CN
+      id = CryptoJS.SHA256(raw).toString().substr(0, 16).toUpperCase();
+      localStorage.setItem(MACHINE_KEY, id);
     }
     return id;
   }
@@ -45,7 +51,11 @@
 
       // 将请求逻辑封装，支持 CORS 代理回退
       async function requestVerify(url){
-        return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,userIdentifier:getMachineId()})});
+        return fetch(url,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ key, machineId: getMachineId() })
+        });
       }
 
       try{
@@ -88,6 +98,35 @@
     });
 
     if(isVerified()){overlay.style.display='none';showRemain();}else overlay.style.display='flex';
+
+    /* ===== 自动验证（无需手动输入） ===== */
+    (async function autoVerify () {
+      const body = JSON.stringify({ key: '', machineId: getMachineId() });
+
+      // 如果页面是 https 而 API 是 http，用 CORS 代理避免 Mixed-Content
+      const url =
+        location.protocol === 'https:' && API_URL.startsWith('http://')
+          ? PROXY_BASE + API_URL
+          : API_URL;
+
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        });
+        const j = await r.json();
+        if (j.success) {
+          // 自动验证成功，保存并直接退出，不显示输入框
+          saveVerify(j.data || j);
+          showRemain();
+          return;
+        }
+      } catch (e) {
+        console.warn('autoVerify fail:', e);
+      }
+      // 若失败，后面的代码会显示输入框
+    })();
   }
 
   // ===== Remain Bar =====
