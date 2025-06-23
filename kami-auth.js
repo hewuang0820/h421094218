@@ -1,6 +1,6 @@
 // kami-auth.js - Card Key Activation System
 (function(){
-  const API_URL = 'http://170.106.175.187/api/card-keys/verify';
+  const API_URL = 'https://api.h421094218.com/api/card-keys/verify';
   const STORAGE_KEY = 'KAMI_VERIFICATION';
   const MACHINE_KEY = 'KAMI_MACHINE_ID';
   const PROXY_BASE = 'https://corsproxy.io/?';
