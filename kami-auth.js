@@ -3,7 +3,7 @@
   const API_URL = 'http://170.106.175.187/api/card-keys/verify';
   const STORAGE_KEY = 'KAMI_VERIFICATION';
   const MACHINE_KEY = 'KAMI_MACHINE_ID';
-  const PROXY_BASE = 'https://cors.isomorphic-git.org/api?url='; // HTTPS proxy that supports POST
+  const PROXY_BASE = 'https://corsproxy.io/?';
 
   // ===== Utils =====
   function sha256(str){return CryptoJS.SHA256(str).toString();}
@@ -45,7 +45,7 @@
         // ==== 兼容 HTTPS 环境：若当前页面为 https 而 API 是 http，会触发 Mixed-Content 阻止。
         //      这种情况下优先改用 https://corsproxy.io 代理，避免第一步就被浏览器拦截。
         const firstUrl = (location.protocol === 'https:' && API_URL.startsWith('http://'))
-            ? PROXY_BASE + encodeURIComponent(API_URL)
+            ? PROXY_BASE + API_URL
             : API_URL;
 
         // 第一次请求（已根据环境决定是否使用代理）
@@ -62,7 +62,7 @@
       }catch(firstErr){
         console.warn('第一次请求验证接口失败:',firstErr);
         try{
-          const proxyUrl= PROXY_BASE + encodeURIComponent(API_URL);
+          const proxyUrl = PROXY_BASE + API_URL;
           const res=await requestVerify(proxyUrl);
           if(!res.ok){throw new Error('status '+res.status);}  
           const json=await res.json();
