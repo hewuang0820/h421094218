@@ -119,6 +119,7 @@
         if (j.success) {
           // 自动验证成功，保存并直接退出，不显示输入框
           saveVerify(j.data || j);
+          overlay.style.display = 'none';
           showRemain();
           return;
         }
